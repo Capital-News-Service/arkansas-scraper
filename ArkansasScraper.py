@@ -30,7 +30,7 @@ chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument("--headless")
 
 chromedriver = '/usr/bin/chromedriver/chromedriver'
-browser = webdriver.Chrome(chromedriver, chrome_options=chrome_options)
+browser = webdriver.Chrome(chromedriver)
 
 vals={}
 with open("fields.py","r") as f:
@@ -125,21 +125,158 @@ def getCase(id):
 
     return iframe_soup[1]
 
+def scrapeDocketEntries(table):
+    rows = table.find_all("tr")
+
+    filling_dates = []
+    descriptions = []
+    names = []
+    monetaries = []
+    entries = []
+    images = []
+
+    count = 0
+
+    #Scrape Docket Entries
+    for row in rows:
+       
+        if (row.has_attr('valign')):
+            cols1 = row.find_all('td')
+            filling_dates.append(cols1[0].get_text())
+            descriptions.append(cols1[1].get_text())
+            names.append(cols1[2].get_text())
+            monetaries.append(cols1[3].get_text().strip('\n'))
+
+            cols2 = rows[count + 1].find_all('td')
+            entries.append(cols2[1].get_text())
+
+            cols3 = rows[count + 2].find_all('td')
+            temp = {}
+            for link in cols3[1].find_all('a', href=True):
+                #This might be an issue if they have multiple files with the same name it would only save one, maybe ill look into this later
+                temp[link.get_text()] = link['href']
+            images.append(temp)
+
+        count = count + 1        
+
+    result = pd.DataFrame(
+            {'filling_date': filling_dates,
+             'description': descriptions,
+             'name' : names,
+             'monetary': monetaries,
+             'entry' : entries,
+             'image' : images
+            })
+
+    return result
+
+def scrapeCaseParties(table):
+    rows = table.find_all("tr")
+
+    seqs = []
+    assocs = []
+    end_dates = []
+    types = []
+    ids = []
+    names = []
+    alliases = []
+
+    count = 0
+
+    #Scrape case parties
+    for row in rows:
+        if (row.has_attr('valign')):
+            if (not row.has_attr('align')):
+                cols1 = row.find_all('td')               
+                seqs.append(cols1[0].get_text())
+                assocs.append(cols1[1].get_text())
+                end_dates.append(cols1[2].get_text())
+                types.append(cols1[3].get_text())
+                ids.append(cols1[4].get_text())
+                names.append(cols1[5].get_text())
+
+                cols2 = rows[count + 1].find_all('td')
+                alliases.append(cols2[4].get_text().strip('\n'))
+
+        count = count + 1        
+
+    result = pd.DataFrame(
+            {'seq': seqs,
+             'assoc': assocs,
+             'end_date' : end_dates,
+             'type': types,
+             'id' : ids,
+             'name' : names,
+             'alliase': alliases
+            })
+
+    return result
+
+def scrapeSentences(page):
+    #get sentances block and convert to raw string
+    block = page.find("a", {"name": "sentences"}).text
+
+    names = []
+    sentances = []
+    sequences = []
+    lengths = []
+    suspended_lengths = []
+    consecutives = []
+    concurrents = []
+    serveds = []
+    signeds = []
+    starts = []
+    probations = []
+    completions = []
+    sentance_details = []
+    violations = []
+    violation_nos = []
+
+    #print(block)
+    #front = block.find('<b>Name</b>:')
+    #print(front)
+    #print(block[front,front+8])
+
+    #bs = block.find_all("b")
+    # for b in bs:
+    #     if b.get_text == "name"
+
+    result = pd.DataFrame(
+            {'name': names,
+             'sentance': sentances,
+             'sequence' : sequences,
+             'length': lengths,
+             'suspended_length' : suspended_lengths,
+             'consecutive' : consecutives,
+             'concurrent': concurrents,
+             'served' : serveds,
+             'signed' : signeds,
+             'start' : starts,
+             'probation' : probations,
+             'completion' : completions,
+             'sentance_detail' : sentance_details,
+             'violation' : violations,
+             'violation_no' : violation_nos
+            })
+
+
+    return block
+
 def getCaseData(id):
     page = getCase(id)
 
     table = page.find_all("table")
     if (table):
 
-        rows = table[2].find_all("tr")
+        #sentences = scrapeSentences(page)
 
-        for row in rows:
-            cols = row.find_all("td")
+        #print(sentences)
 
-            for col in cols:
-                print(col.get_text())
+        docket_entries = scrapeDocketEntries(table[3])
 
+        case_parties = scrapeCaseParties(table[2])
 
+      
     
 def getAllData():
     end = 1990
@@ -174,8 +311,8 @@ def getAllData():
             
         end = end + 1
 
-getAllData()
-#getCaseData("02DR-82-381")
+#getAllData()
+getCaseData("04CR-17-237")
 
 
 #case_type
