@@ -1,3 +1,6 @@
+# Jake Gluck - Capital News Service #
+
+
 #pip.main(['install','requests'])
 #pip.main(['install','pandas'])
 #pip.main(['install','beautifulsoup4'])
@@ -30,7 +33,7 @@ chrome_options = webdriver.ChromeOptions()
 chrome_options.add_argument("--headless")
 
 chromedriver = '/usr/bin/chromedriver/chromedriver'
-browser = webdriver.Chrome(chromedriver)
+browser = webdriver.Chrome(chromedriver, chrome_options=chrome_options)
 
 vals={}
 with open("fields.py","r") as f:
@@ -212,12 +215,27 @@ def scrapeCaseParties(table):
 
     return result
 
+def chompString(block, f, b):
+    front = block.find(f)
+    back = block.find(b)
+    return ((block[(front + len(f)):back]).strip()).rstrip()
+
+def chompStringV(block, f, b):
+    front = block.find(f)
+    back = block.find(b)
+    return ((block[(front + len(f) + 1):back]).strip()).rstrip().replace("&nbsp", "").replace('\n', ' ')
+
+def chompStringEnd(block, f):
+    front = block.find(f)
+    back = block.find(";")
+    return ((block[(front + len(f)):back + 4]).strip()).rstrip()
+
 def scrapeSentences(page):
     #get sentances block and convert to raw string
     block = page.find("a", {"name": "sentences"}).text
 
     names = []
-    sentances = []
+    sentences = []
     sequences = []
     lengths = []
     suspended_lengths = []
@@ -228,22 +246,30 @@ def scrapeSentences(page):
     starts = []
     probations = []
     completions = []
-    sentance_details = []
-    violations = []
+    sentence_details = []
     violation_nos = []
 
-    #print(block)
-    #front = block.find('<b>Name</b>:')
-    #print(front)
-    #print(block[front,front+8])
+    while block.find('Name:') != -1:
+        names.append(chompString(block, 'Name:','Sentence:'))
+        sentences.append(chompString(block, 'Sentence:','Sequence:'))
+        sequences.append(chompString(block, 'Sequence:','Length:'))
+        lengths.append(chompString(block, 'Length:','Suspended Length:'))
+        suspended_lengths.append(chompString(block, 'Suspended Length:','Consecutive:'))
+        consecutives.append(chompString(block, 'Consecutive:','Concurrent:'))
+        concurrents.append(chompString(block, 'Concurrent:','Served:'))
+        serveds.append(chompString(block, 'Served:','Signed:'))
+        signeds.append(chompString(block, 'Signed:','Start:'))
+        starts.append(chompString(block, 'Start:','Probation:'))
+        probations.append(chompString(block, 'Probation:','Completion:'))
+        completions.append(chompString(block, 'Completion:','Sentence Detail:'))
+        sentence_details.append(chompString(block, 'Sentence Detail:','Violation(s)'))
+        violation_nos.append(chompStringEnd(block, 'Violation No:'))
+        block = block[block.find(";") + 3:]
 
-    #bs = block.find_all("b")
-    # for b in bs:
-    #     if b.get_text == "name"
 
     result = pd.DataFrame(
             {'name': names,
-             'sentance': sentances,
+             'sentence': sentences,
              'sequence' : sequences,
              'length': lengths,
              'suspended_length' : suspended_lengths,
@@ -254,13 +280,64 @@ def scrapeSentences(page):
              'start' : starts,
              'probation' : probations,
              'completion' : completions,
-             'sentance_detail' : sentance_details,
-             'violation' : violations,
+             'sentence_detail' : sentence_details,
              'violation_no' : violation_nos
             })
 
 
-    return block
+    return result
+
+def scrapeViolations(page):
+    #get sentances block and convert to raw string
+    block = page.find("a", {"name": "violations"}).text
+
+    violations = []
+    citation_nums = []
+    age_at_violations = []
+    pleas = []
+    disps = []
+    levels = []
+    violation_dates = []
+   # violation_times = []
+    #violation_texts = []
+    
+
+    block = block[block.find("Violation") + 9:]
+
+    while block.find('Violation') != -1:
+
+        violations.append(chompStringV(block, 'Violation','Citation#'))
+        citation_nums.append(chompStringV(block, 'Citation#','Age at Violation'))
+        age_at_violations.append(chompStringV(block, 'Age at Violation','Plea'))
+        pleas.append(chompStringV(block, 'Plea','Disp'))
+        disps.append(chompStringV(block, 'Disp','Level'))
+        levels.append(chompStringV(block, 'Level', "Violation Date"))
+        violation_dates.append(chompStringV(block, 'Violation Date','Violation Time'))
+        block = block[block.find("Violation Time:") + 20:]
+        #violation_times.append(chompStringV(block, 'Violation Time','\n'))
+        # print(block[0:200])
+        # if (block[0:200].find("Violation Text") == -1):
+        #     violation_texts.append("")
+        #     block = block[block.find("Violation Time") + 14:]
+        # else:
+        #     violation_texts.append(chompStringV(block, 'Violation Text', '\n'))
+        #     block = block[block.find("Violation Text:") + 20:]
+
+
+    result = pd.DataFrame(
+            {'violation': violations,
+             'citation_num': citation_nums,
+             'age_at_violations' : age_at_violations,
+             'plea': pleas,
+             'disp' : disps,
+             'level' : levels,
+             'violation_date' : violation_dates,
+             #'violation_times': violation_times,
+             #'violation_text': violation_texts
+            })
+
+
+    return result
 
 def getCaseData(id):
     page = getCase(id)
@@ -268,15 +345,26 @@ def getCaseData(id):
     table = page.find_all("table")
     if (table):
 
-        #sentences = scrapeSentences(page)
+        sentences = scrapeSentences(page)
 
-        #print(sentences)
+        violations = scrapeViolations(page)
 
         docket_entries = scrapeDocketEntries(table[3])
 
         case_parties = scrapeCaseParties(table[2])
 
-      
+        case = pd.DataFrame(
+            {'sentance': [sentences],
+             'violation': [violations],
+             'docket_entrie' : [docket_entries],
+             'case_partie': [case_parties],
+            })
+
+        print(case)
+
+        case.to_csv("case_test.csv", sep=',')
+
+        return case
     
 def getAllData():
     end = 1990
