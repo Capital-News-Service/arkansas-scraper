@@ -41,15 +41,16 @@ with open("fields.py","r") as f:
     
 counties = vals["counties"]
 
-
-
-def buildUrl(county, begin_date, end_date):
+# Build URL of a search result page
+def buildUrl(county, begin_date, end_date, type):
     base = "https://caseinfo.aoc.arkansas.gov/cconnect/PROD/public/ck_public_qry_doct.cp_new_case_frames"
-    param_text = "?" + "county_code=" + county + "&locn_code=ALL&begin_date=" + begin_date + "&end_date=" + end_date
+    param_text = "?" + "county_code=" + county + "&locn_code=ALL&begin_date=" + begin_date + "&end_date=" + end_date + "&case_type=" + type
     return base + param_text
 
-def getPage(county, begin_date, end_date):
-    url = buildUrl(county, begin_date, end_date)
+# Requests search result html data
+def getSearchPage(county, begin_date, end_date, type):
+    url = buildUrl(county, begin_date, end_date, type)
+    #print(url)
     browser.get(url)
     time.sleep(3)
     soup = BeautifulSoup(browser.page_source, "lxml")
@@ -63,56 +64,9 @@ def getPage(county, begin_date, end_date):
         iframe_soup.append(BeautifulSoup(response, "lxml"))
     
     return iframe_soup[1]
-    
-def getData(county, begin_date, end_date):
-    page = getPage(county, begin_date, end_date)
-    
-    dates = []
-    ids = []
-    descriptions = []
-    types = []
-    judges = []
-    courts = []
-    
-    table = page.find("table")
-    if (table):
-        rows = table.find_all("tr")
 
-        for row in rows:
-            cols = row.find_all("td")
-            if (len(cols) > 5):
-                dates.append(cols[0].get_text())
-                ids.append(cols[1].get_text().split(" ", 1)[0]),
-                descriptions.append(cols[1].get_text().split(" ", 1)[1])
-                types.append(cols[2].get_text())
-                judges.append(cols[3].get_text())
-                courts.append(cols[4].get_text())
-        
-        data = pd.DataFrame(
-            {'date': dates,
-             'id': ids,
-             'description' : descriptions,
-             'type': types,
-             'judge' : judges,
-             'court' : courts
-            })
-            
-        return data
-
-    else:
-
-        data = pd.DataFrame(
-            {'date': dates,
-             'id': ids,
-             'description' : descriptions,
-             'type': types,
-             'judge' : judges,
-             'court' : courts
-            })
-
-        return data
-
-def getCase(id):
+# Requests individual cases html data
+def getCasePage(id):
     url = "https://caseinfo.aoc.arkansas.gov/cconnect/PROD/public/ck_public_qry_doct.cp_dktrpt_frames?case_id=" + id
     browser.get(url)
     time.sleep(3)
@@ -128,7 +82,26 @@ def getCase(id):
 
     return iframe_soup[1]
 
-def scrapeDocketEntries(table):
+# Helper Method Scrapping Sentances
+def chompString(block, f, b):
+    front = block.find(f)
+    back = block.find(b)
+    return ((block[(front + len(f)):back]).strip()).rstrip()
+
+# Helper Method Scrapping Violations
+def chompStringV(block, f, b):
+    front = block.find(f)
+    back = block.find(b)
+    return ((block[(front + len(f) + 1):back]).strip()).rstrip().replace("&nbsp", "").replace('\n', ' ')
+
+# Helper Method Scrapping End of Sentances
+def chompStringEnd(block, f):
+    front = block.find(f)
+    back = block.find(";")
+    return ((block[(front + len(f)):back + 4]).strip()).rstrip()
+
+# Scrape all docket entries of one case
+def scrapeDocketEntries(case_id, table):
     rows = table.find_all("tr")
 
     filling_dates = []
@@ -163,7 +136,8 @@ def scrapeDocketEntries(table):
         count = count + 1        
 
     result = pd.DataFrame(
-            {'filling_date': filling_dates,
+            {'case_id' : case_id,
+             'filling_date': filling_dates,
              'description': descriptions,
              'name' : names,
              'monetary': monetaries,
@@ -173,7 +147,8 @@ def scrapeDocketEntries(table):
 
     return result
 
-def scrapeCaseParties(table):
+# Scrape all case parties of one case
+def scrapeCaseParties(case_id, table):
     rows = table.find_all("tr")
 
     seqs = []
@@ -204,7 +179,8 @@ def scrapeCaseParties(table):
         count = count + 1        
 
     result = pd.DataFrame(
-            {'seq': seqs,
+            {'case_id': case_id,
+             'seq': seqs,
              'assoc': assocs,
              'end_date' : end_dates,
              'type': types,
@@ -215,22 +191,8 @@ def scrapeCaseParties(table):
 
     return result
 
-def chompString(block, f, b):
-    front = block.find(f)
-    back = block.find(b)
-    return ((block[(front + len(f)):back]).strip()).rstrip()
-
-def chompStringV(block, f, b):
-    front = block.find(f)
-    back = block.find(b)
-    return ((block[(front + len(f) + 1):back]).strip()).rstrip().replace("&nbsp", "").replace('\n', ' ')
-
-def chompStringEnd(block, f):
-    front = block.find(f)
-    back = block.find(";")
-    return ((block[(front + len(f)):back + 4]).strip()).rstrip()
-
-def scrapeSentences(page):
+# Scrape all sentances of one case
+def scrapeSentences(case_id, page):
     #get sentances block and convert to raw string
     block = page.find("a", {"name": "sentences"}).text
 
@@ -268,7 +230,8 @@ def scrapeSentences(page):
 
 
     result = pd.DataFrame(
-            {'name': names,
+            {'case_id' : case_id,
+             'name': names,
              'sentence': sentences,
              'sequence' : sequences,
              'length': lengths,
@@ -287,7 +250,8 @@ def scrapeSentences(page):
 
     return result
 
-def scrapeViolations(page):
+# Scrape all violations of one case
+def scrapeViolations(case_id, page):
     #get sentances block and convert to raw string
     block = page.find("a", {"name": "violations"}).text
 
@@ -325,84 +289,121 @@ def scrapeViolations(page):
 
 
     result = pd.DataFrame(
-            {'violation': violations,
+            {'case_id' : case_id,
+             'violation': violations,
              'citation_num': citation_nums,
              'age_at_violations' : age_at_violations,
              'plea': pleas,
              'disp' : disps,
              'level' : levels,
-             'violation_date' : violation_dates,
-             #'violation_times': violation_times,
-             #'violation_text': violation_texts
+             'violation_date' : violation_dates
             })
 
 
     return result
 
-def getCaseData(id):
-    page = getCase(id)
+# Scrapes Status of an Individual Case
+def scrapeStatus(case_id, table):
+    rows = table.find_all("tr")
 
-    table = page.find_all("table")
-    if (table):
+    des = []
 
-        sentences = scrapeSentences(page)
+    for row in rows:
+        cols = row.find_all("td")
 
-        violations = scrapeViolations(page)
 
-        docket_entries = scrapeDocketEntries(table[3])
+        for col in cols:
+            des.append(col.get_text().strip())
 
-        case_parties = scrapeCaseParties(table[2])
+    return des[17]
 
-        case = pd.DataFrame(
-            {'sentance': [sentences],
-             'violation': [violations],
-             'docket_entrie' : [docket_entries],
-             'case_partie': [case_parties],
-            })
+# Scrape data for each case from search result page
+def getData():
 
-        print(case)
+    violations = []
+    sentences = []
+    parties = []
+    docket_entries = []
 
-        case.to_csv("case_test.csv", sep=',')
+    dates = []
+    ids = []
+    descriptions = []
+    types = []
+    judges = []
+    courts = []
 
-        return case
-    
-def getAllData():
-    end = 1990
-
-    for begin in range(1990,2018):
+    for begin in range(2017,2018):
+        end = begin + 1
         print("begin " + str(begin))
         print("end " + str(end))
-        begin_date = "01/01/" + str(begin)
-        end_date = "01/02/" + str(end)
+        begin_date = "12/26/" + str(begin)
+        end_date = "12/26/" + str(begin)
 
-        dates = []
-        ids= []
-        types = []
-        descriptions = []
-        judges = []
-        courts = []
-
-        result = pd.DataFrame(
-                {'date': dates,
-                 'id': ids,
-                 'description' : descriptions,
-                 'type': types,
-                 'judge' : judges,
-                 'court' : courts
-                })
-
+        #loop through every county
         for county in counties:
-            result = result.append(getData(county, begin_date, end_date))
             print("county " + county)
-            print(result.size)
-            print(result)
+            type = "11 - CRIMINAL CIRCUIT"
+
+            #get search result page
+            page = getSearchPage(county, begin_date, end_date, type)
             
-        end = end + 1
+            table = page.find("table")
+            if (table):
+                rows = table.find_all("tr")
 
-#getAllData()
-getCaseData("04CR-17-237")
+                #go through each page in the table
+                for row in rows:
+                    cols = row.find_all("td")
+
+                    #if its a full row
+                    if (len(cols) > 5):
+                        dates.append(cols[0].get_text())
+                        temp_id = cols[1].get_text().split(" ", 1)[0]
+                        ids.append(temp_id),
+                        descriptions.append(cols[1].get_text().split(" ", 1)[1])
+                        types.append(cols[2].get_text())
+                        judges.append(cols[3].get_text())
+                        courts.append(cols[4].get_text())
+
+                        #get case page for indivudual case
+                        temp_page = getCasePage(temp_id)
+                        temp_tables = temp_page.find_all("table")
+                        num = len(temp_tables)
+                        if num == 6:
+                            violations.append(scrapeViolations(temp_id, temp_page))
+                            sentences.append(scrapeSentences(temp_id, temp_page))
+                            parties.append(scrapeCaseParties(temp_id, temp_tables[3]))
+                            docket_entries.append(scrapeDocketEntries(temp_id, temp_tables[4]))
+                        elif num == 5:
+                            violations.append(scrapeViolations(temp_id, temp_page))
+                            sentences.append(scrapeSentences(temp_id, temp_page))
+                            parties.append(scrapeCaseParties(temp_id, temp_tables[2]))
+                            docket_entries.append(scrapeDocketEntries(temp_id, temp_tables[3]))
+                        else:
+                            print("Diff # of tables? # = " + num + " ID:" + temp_id)    
+                        print(temp_id)
+                
+    cases = pd.DataFrame(
+        {'date': dates,
+         'id': ids,
+         'description' : descriptions,
+         'type': types,
+         'judge' : judges,
+         'court' : courts
+        })
+
+    v = pd.DataFrame(result, columns=['head', 'from', 'to', 'tweets', 'size', 'dates', 'names', 'size2', 'usernames'])
+    s = pd.DataFrame(result, columns=['case_id','name','sentence','sequence','length','suspended_length','consecutive','concurrent',
+             'served','signed','start','probation','completion','sentence_detail','violation_no'])
+    p = pd.DataFrame(result, columns=['head', 'from', 'to', 'tweets', 'size', 'dates', 'names', 'size2', 'usernames'])
+    d = pd.DataFrame(result, columns=['case_id', 'filling_date', 'description', 'name', 'monetary', 'entry', 'image'])
 
 
-#case_type
-#cort_code
-#docket_code
+    print(cases)
+    cases.to_csv("cases.csv", sep=',')
+    violations.to_csv("violations.csv", sep=',')
+    sentences.to_csv("sentences.csv", sep=',')
+    parties.to_csv("parties.csv", sep=',')
+    docket_entries.to_csv("docket_entries.csv", sep=',')
+
+getData()
