@@ -102,14 +102,10 @@ def chompStringEnd(block, f):
 
 # Scrape all docket entries of one case
 def scrapeDocketEntries(case_id, table):
-    rows = table.find_all("tr")
 
-    filling_dates = []
-    descriptions = []
-    names = []
-    monetaries = []
-    entries = []
-    images = []
+    result = []
+
+    rows = table.find_all("tr")
 
     count = 0
 
@@ -118,46 +114,35 @@ def scrapeDocketEntries(case_id, table):
        
         if (row.has_attr('valign')):
             cols1 = row.find_all('td')
-            filling_dates.append(cols1[0].get_text())
-            descriptions.append(cols1[1].get_text())
-            names.append(cols1[2].get_text())
-            monetaries.append(cols1[3].get_text().strip('\n'))
+            v = []
+            v.append(case_id)
+            v.append(cols1[0].get_text())
+            v.append(cols1[1].get_text())
+            v.append(cols1[2].get_text())
+            v.append(cols1[3].get_text().strip('\n'))
 
             cols2 = rows[count + 1].find_all('td')
-            entries.append(cols2[1].get_text())
+            v.append(cols2[1].get_text())
 
             cols3 = rows[count + 2].find_all('td')
             temp = {}
             for link in cols3[1].find_all('a', href=True):
                 #This might be an issue if they have multiple files with the same name it would only save one, maybe ill look into this later
                 temp[link.get_text()] = link['href']
-            images.append(temp)
+            v.append(temp)
+
+            result.append(v)
 
         count = count + 1        
-
-    result = pd.DataFrame(
-            {'case_id' : case_id,
-             'filling_date': filling_dates,
-             'description': descriptions,
-             'name' : names,
-             'monetary': monetaries,
-             'entry' : entries,
-             'image' : images
-            })
 
     return result
 
 # Scrape all case parties of one case
 def scrapeCaseParties(case_id, table):
-    rows = table.find_all("tr")
 
-    seqs = []
-    assocs = []
-    end_dates = []
-    types = []
-    ids = []
-    names = []
-    alliases = []
+    result = []
+
+    rows = table.find_all("tr")
 
     count = 0
 
@@ -165,119 +150,88 @@ def scrapeCaseParties(case_id, table):
     for row in rows:
         if (row.has_attr('valign')):
             if (not row.has_attr('align')):
-                cols1 = row.find_all('td')               
-                seqs.append(cols1[0].get_text())
-                assocs.append(cols1[1].get_text())
-                end_dates.append(cols1[2].get_text())
-                types.append(cols1[3].get_text())
-                ids.append(cols1[4].get_text())
-                names.append(cols1[5].get_text())
+                v = []
+                cols1 = row.find_all('td')  
+                v.append(case_id)             
+                v.append(cols1[0].get_text())
+                v.append(cols1[1].get_text())
+                v.append(cols1[2].get_text())
+                v.append(cols1[3].get_text())
+                v.append(cols1[4].get_text())
+                v.append(cols1[5].get_text())
 
                 cols2 = rows[count + 1].find_all('td')
-                alliases.append(cols2[4].get_text().strip('\n'))
+                v.append(cols2[4].get_text().strip('\n'))
 
-        count = count + 1        
+                result.append(v)
 
-    result = pd.DataFrame(
-            {'case_id': case_id,
-             'seq': seqs,
-             'assoc': assocs,
-             'end_date' : end_dates,
-             'type': types,
-             'id' : ids,
-             'name' : names,
-             'alliase': alliases
-            })
+        count = count + 1   
+    
 
     return result
 
 # Scrape all sentances of one case
 def scrapeSentences(case_id, page):
+
+    result = []
+
     #get sentances block and convert to raw string
     block = page.find("a", {"name": "sentences"}).text
 
-    names = []
-    sentences = []
-    sequences = []
-    lengths = []
-    suspended_lengths = []
-    consecutives = []
-    concurrents = []
-    serveds = []
-    signeds = []
-    starts = []
-    probations = []
-    completions = []
-    sentence_details = []
-    violation_nos = []
+    run = False
 
     while block.find('Name:') != -1:
-        names.append(chompString(block, 'Name:','Sentence:'))
-        sentences.append(chompString(block, 'Sentence:','Sequence:'))
-        sequences.append(chompString(block, 'Sequence:','Length:'))
-        lengths.append(chompString(block, 'Length:','Suspended Length:'))
-        suspended_lengths.append(chompString(block, 'Suspended Length:','Consecutive:'))
-        consecutives.append(chompString(block, 'Consecutive:','Concurrent:'))
-        concurrents.append(chompString(block, 'Concurrent:','Served:'))
-        serveds.append(chompString(block, 'Served:','Signed:'))
-        signeds.append(chompString(block, 'Signed:','Start:'))
-        starts.append(chompString(block, 'Start:','Probation:'))
-        probations.append(chompString(block, 'Probation:','Completion:'))
-        completions.append(chompString(block, 'Completion:','Sentence Detail:'))
-        sentence_details.append(chompString(block, 'Sentence Detail:','Violation(s)'))
-        violation_nos.append(chompStringEnd(block, 'Violation No:'))
+        run = True
+        v = []
+        v.append(case_id)
+        v.append(chompString(block, 'Name:','Sentence:'))
+        v.append(chompString(block, 'Sentence:','Sequence:'))
+        v.append(chompString(block, 'Sequence:','Length:'))
+        v.append(chompString(block, 'Length:','Suspended Length:'))
+        v.append(chompString(block, 'Suspended Length:','Consecutive:'))
+        v.append(chompString(block, 'Consecutive:','Concurrent:'))
+        v.append(chompString(block, 'Concurrent:','Served:'))
+        v.append(chompString(block, 'Served:','Signed:'))
+        v.append(chompString(block, 'Signed:','Start:'))
+        v.append(chompString(block, 'Start:','Probation:'))
+        v.append(chompString(block, 'Probation:','Completion:'))
+        v.append(chompString(block, 'Completion:','Sentence Detail:'))
+        v.append(chompString(block, 'Sentence Detail:','Violation(s)'))
+        v.append(chompStringEnd(block, 'Violation No:'))
         block = block[block.find(";") + 3:]
+        result.append(v)
+     
+    #No sentence info found
+    #maybe i shouldn't do this does the while loop ever run?   
+    if run == False:
+        result = [case_id, "", "", "", "", "", "", "", "", "", "", "", ""]
 
-
-    result = pd.DataFrame(
-            {'case_id' : case_id,
-             'name': names,
-             'sentence': sentences,
-             'sequence' : sequences,
-             'length': lengths,
-             'suspended_length' : suspended_lengths,
-             'consecutive' : consecutives,
-             'concurrent': concurrents,
-             'served' : serveds,
-             'signed' : signeds,
-             'start' : starts,
-             'probation' : probations,
-             'completion' : completions,
-             'sentence_detail' : sentence_details,
-             'violation_no' : violation_nos
-            })
-
-
+    print("bot " + str(result))
     return result
 
 # Scrape all violations of one case
 def scrapeViolations(case_id, page):
+
+    result = []
+
     #get sentances block and convert to raw string
     block = page.find("a", {"name": "violations"}).text
-
-    violations = []
-    citation_nums = []
-    age_at_violations = []
-    pleas = []
-    disps = []
-    levels = []
-    violation_dates = []
-   # violation_times = []
-    #violation_texts = []
-    
 
     block = block[block.find("Violation") + 9:]
 
     while block.find('Violation') != -1:
 
-        violations.append(chompStringV(block, 'Violation','Citation#'))
-        citation_nums.append(chompStringV(block, 'Citation#','Age at Violation'))
-        age_at_violations.append(chompStringV(block, 'Age at Violation','Plea'))
-        pleas.append(chompStringV(block, 'Plea','Disp'))
-        disps.append(chompStringV(block, 'Disp','Level'))
-        levels.append(chompStringV(block, 'Level', "Violation Date"))
-        violation_dates.append(chompStringV(block, 'Violation Date','Violation Time'))
+        v = []
+        v.append(case_id)
+        v.append(chompStringV(block, 'Violation','Citation#'))
+        v.append(chompStringV(block, 'Citation#','Age at Violation'))
+        v.append(chompStringV(block, 'Age at Violation','Plea'))
+        v.append(chompStringV(block, 'Plea','Disp'))
+        v.append(chompStringV(block, 'Disp','Level'))
+        v.append(chompStringV(block, 'Level', "Violation Date"))
+        v.append(chompStringV(block, 'Violation Date','Violation Time'))
         block = block[block.find("Violation Time:") + 20:]
+
         #violation_times.append(chompStringV(block, 'Violation Time','\n'))
         # print(block[0:200])
         # if (block[0:200].find("Violation Text") == -1):
@@ -287,17 +241,7 @@ def scrapeViolations(case_id, page):
         #     violation_texts.append(chompStringV(block, 'Violation Text', '\n'))
         #     block = block[block.find("Violation Text:") + 20:]
 
-
-    result = pd.DataFrame(
-            {'case_id' : case_id,
-             'violation': violations,
-             'citation_num': citation_nums,
-             'age_at_violations' : age_at_violations,
-             'plea': pleas,
-             'disp' : disps,
-             'level' : levels,
-             'violation_date' : violation_dates
-            })
+        result.append([v])
 
 
     return result
@@ -370,15 +314,15 @@ def getData():
                         temp_tables = temp_page.find_all("table")
                         num = len(temp_tables)
                         if num == 6:
-                            violations.append(scrapeViolations(temp_id, temp_page))
-                            sentences.append(scrapeSentences(temp_id, temp_page))
-                            parties.append(scrapeCaseParties(temp_id, temp_tables[3]))
-                            docket_entries.append(scrapeDocketEntries(temp_id, temp_tables[4]))
+                            violations = violations + (scrapeViolations(temp_id, temp_page))
+                            sentences = sentences + (scrapeSentences(temp_id, temp_page))
+                            parties = parties + (scrapeCaseParties(temp_id, temp_tables[3]))
+                            docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[4]))
                         elif num == 5:
-                            violations.append(scrapeViolations(temp_id, temp_page))
-                            sentences.append(scrapeSentences(temp_id, temp_page))
-                            parties.append(scrapeCaseParties(temp_id, temp_tables[2]))
-                            docket_entries.append(scrapeDocketEntries(temp_id, temp_tables[3]))
+                            violations = violations + (scrapeViolations(temp_id, temp_page))
+                            sentences = sentences + (scrapeSentences(temp_id, temp_page))
+                            parties = parties + (scrapeCaseParties(temp_id, temp_tables[2]))
+                            docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[3]))
                         else:
                             print("Diff # of tables? # = " + num + " ID:" + temp_id)    
                         print(temp_id)
@@ -392,18 +336,20 @@ def getData():
          'court' : courts
         })
 
-    v = pd.DataFrame(result, columns=['head', 'from', 'to', 'tweets', 'size', 'dates', 'names', 'size2', 'usernames'])
-    s = pd.DataFrame(result, columns=['case_id','name','sentence','sequence','length','suspended_length','consecutive','concurrent',
+    v = pd.DataFrame(violations, columns=['case_id', 'violation', 'citation_num', 'age_at_violation', 'plea', 'disp', 'level', 'violation_date'])
+    s = pd.DataFrame(sentences, columns=['case_id','name','sentence','sequence','length','suspended_length','consecutive','concurrent',
              'served','signed','start','probation','completion','sentence_detail','violation_no'])
-    p = pd.DataFrame(result, columns=['head', 'from', 'to', 'tweets', 'size', 'dates', 'names', 'size2', 'usernames'])
-    d = pd.DataFrame(result, columns=['case_id', 'filling_date', 'description', 'name', 'monetary', 'entry', 'image'])
+    p = pd.DataFrame(parties, columns=['case_id', 'seq', 'assoc', 'end_date', 'type', 'id', 'name', 'aliases'])
+    d = pd.DataFrame(docket_entries, columns=['case_id', 'filling_date', 'description', 'name', 'monetary', 'entry', 'image'])
 
+    # print(sentences)
+    # print("*********")
+    # print(s)
 
-    print(cases)
     cases.to_csv("cases.csv", sep=',')
-    violations.to_csv("violations.csv", sep=',')
-    sentences.to_csv("sentences.csv", sep=',')
-    parties.to_csv("parties.csv", sep=',')
-    docket_entries.to_csv("docket_entries.csv", sep=',')
+    v.to_csv("violations.csv", sep=',')
+    s.to_csv("sentences.csv", sep=',')
+    p.to_csv("parties.csv", sep=',')
+    d.to_csv("docket_entries.csv", sep=',')
 
 getData()
