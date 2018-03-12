@@ -1,5 +1,6 @@
 # Jake Gluck - Capital News Service #
 
+#Dianne Robinson 5016876799
 
 #pip.main(['install','requests'])
 #pip.main(['install','pandas'])
@@ -40,6 +41,7 @@ with open("fields.py","r") as f:
     vals = json.loads(f.read())
     
 counties = vals["counties"]
+stypes = vals["types"]
 
 # Build URL of a search result page
 def buildUrl(county, begin_date, end_date, type):
@@ -86,7 +88,7 @@ def getCasePage(id):
 def chompString(block, f, b):
     front = block.find(f)
     back = block.find(b)
-    return ((block[(front + len(f)):back]).strip()).rstrip()
+    return ((block[(front + len(f)):back]).strip()).rstrip().replace("Â"," ")
 
 # Helper Method Scrapping Violations
 def chompStringV(block, f, b):
@@ -178,10 +180,10 @@ def scrapeSentences(case_id, page):
     #get sentances block and convert to raw string
     block = page.find("a", {"name": "sentences"}).text
 
-    run = False
+    # run = False
 
     while block.find('Name:') != -1:
-        run = True
+        # run = True
         v = []
         v.append(case_id)
         v.append(chompString(block, 'Name:','Sentence:'))
@@ -203,10 +205,9 @@ def scrapeSentences(case_id, page):
      
     #No sentence info found
     #maybe i shouldn't do this does the while loop ever run?   
-    if run == False:
-        result = [case_id, "", "", "", "", "", "", "", "", "", "", "", ""]
+    # if run == False:
+    #     result = [case_id, "", "", "", "", "", "", "", "", "", "", "", ""]
 
-    print("bot " + str(result))
     return result
 
 # Scrape all violations of one case
@@ -241,7 +242,7 @@ def scrapeViolations(case_id, page):
         #     violation_texts.append(chompStringV(block, 'Violation Text', '\n'))
         #     block = block[block.find("Violation Text:") + 20:]
 
-        result.append([v])
+        result.append(v)
 
 
     return result
@@ -270,66 +271,74 @@ def getData():
     docket_entries = []
 
     dates = []
+    districts = []
+    case_types =[]
     ids = []
-    descriptions = []
     types = []
+    descriptions = []
     judges = []
     courts = []
 
-    for begin in range(2017,2018):
+    for begin in range(2013,2018):
         end = begin + 1
         print("begin " + str(begin))
         print("end " + str(end))
-        begin_date = "12/26/" + str(begin)
-        end_date = "12/26/" + str(begin)
+        begin_date = "1/01/" + str(begin)
+        end_date = "12/31/" + str(begin)
 
-        #loop through every county
-        for county in counties:
-            print("county " + county)
-            type = "11 - CRIMINAL CIRCUIT"
+        #loop through every type
+        for stype in stypes:
+            print("Type: " + stype)
+            #loop through every county
+            for county in counties:
+                print("county " + county)
 
-            #get search result page
-            page = getSearchPage(county, begin_date, end_date, type)
-            
-            table = page.find("table")
-            if (table):
-                rows = table.find_all("tr")
+                #get search result page
+                page = getSearchPage(county, begin_date, end_date, stype)
+                
+                table = page.find("table")
+                if (table):
+                    rows = table.find_all("tr")
 
-                #go through each page in the table
-                for row in rows:
-                    cols = row.find_all("td")
+                    #go through each page in the table
+                    for row in rows:
+                        cols = row.find_all("td")
 
-                    #if its a full row
-                    if (len(cols) > 5):
-                        dates.append(cols[0].get_text())
-                        temp_id = cols[1].get_text().split(" ", 1)[0]
-                        ids.append(temp_id),
-                        descriptions.append(cols[1].get_text().split(" ", 1)[1])
-                        types.append(cols[2].get_text())
-                        judges.append(cols[3].get_text())
-                        courts.append(cols[4].get_text())
+                        #if its a full row
+                        if (len(cols) > 5):
+                            dates.append(cols[0].get_text())
+                            temp_id = cols[1].get_text().split(" ", 1)[0]
+                            ids.append(temp_id)
+                            districts.append(county)
+                            case_types.append(stype)
+                            descriptions.append(cols[1].get_text().split(" ", 1)[1])
+                            types.append(cols[2].get_text())
+                            judges.append(cols[3].get_text())
+                            courts.append(cols[4].get_text())
 
-                        #get case page for indivudual case
-                        temp_page = getCasePage(temp_id)
-                        temp_tables = temp_page.find_all("table")
-                        num = len(temp_tables)
-                        if num == 6:
-                            violations = violations + (scrapeViolations(temp_id, temp_page))
-                            sentences = sentences + (scrapeSentences(temp_id, temp_page))
-                            parties = parties + (scrapeCaseParties(temp_id, temp_tables[3]))
-                            docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[4]))
-                        elif num == 5:
-                            violations = violations + (scrapeViolations(temp_id, temp_page))
-                            sentences = sentences + (scrapeSentences(temp_id, temp_page))
-                            parties = parties + (scrapeCaseParties(temp_id, temp_tables[2]))
-                            docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[3]))
-                        else:
-                            print("Diff # of tables? # = " + num + " ID:" + temp_id)    
-                        print(temp_id)
+                            #get case page for indivudual case
+                            temp_page = getCasePage(temp_id)
+                            temp_tables = temp_page.find_all("table")
+                            num = len(temp_tables)
+                            if num == 6:
+                                violations = violations + (scrapeViolations(temp_id, temp_page))
+                                sentences = sentences + (scrapeSentences(temp_id, temp_page))
+                                parties = parties + (scrapeCaseParties(temp_id, temp_tables[3]))
+                                docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[4]))
+                            elif num == 5:
+                                violations = violations + (scrapeViolations(temp_id, temp_page))
+                                sentences = sentences + (scrapeSentences(temp_id, temp_page))
+                                parties = parties + (scrapeCaseParties(temp_id, temp_tables[2]))
+                                docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[3]))
+                            else:
+                                print("Diff # of tables? # = " + num + " ID:" + temp_id)    
+                            print(temp_id)
                 
     cases = pd.DataFrame(
         {'date': dates,
          'id': ids,
+         "county": districts,
+         "case_type": case_types,
          'description' : descriptions,
          'type': types,
          'judge' : judges,
@@ -337,8 +346,9 @@ def getData():
         })
 
     v = pd.DataFrame(violations, columns=['case_id', 'violation', 'citation_num', 'age_at_violation', 'plea', 'disp', 'level', 'violation_date'])
-    s = pd.DataFrame(sentences, columns=['case_id','name','sentence','sequence','length','suspended_length','consecutive','concurrent',
-             'served','signed','start','probation','completion','sentence_detail','violation_no'])
+    if sentences != []:
+        s = pd.DataFrame(sentences, columns=['case_id','name','sentence','sequence','length','suspended_length','consecutive','concurrent',
+                'served','signed','start','probation','completion','sentence_detail','violation_no'])
     p = pd.DataFrame(parties, columns=['case_id', 'seq', 'assoc', 'end_date', 'type', 'id', 'name', 'aliases'])
     d = pd.DataFrame(docket_entries, columns=['case_id', 'filling_date', 'description', 'name', 'monetary', 'entry', 'image'])
 
@@ -348,7 +358,10 @@ def getData():
 
     cases.to_csv("cases.csv", sep=',')
     v.to_csv("violations.csv", sep=',')
-    s.to_csv("sentences.csv", sep=',')
+
+    if sentences != []:
+        s.to_csv("sentences.csv", sep=',')
+
     p.to_csv("parties.csv", sep=',')
     d.to_csv("docket_entries.csv", sep=',')
 
