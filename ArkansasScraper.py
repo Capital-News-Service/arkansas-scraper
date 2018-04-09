@@ -88,8 +88,7 @@ def getCasePage(id):
 def chompString(block, f, b):
     front = block.find(f)
     back = block.find(b)
-    return ((block[(front + len(f)):back]).strip()).rstrip().replace("Â"," ")
-
+    return ((block[(front + len(f)):back]).strip()).rstrip().encode('ascii', 'ignore')
 # Helper Method Scrapping Violations
 def chompStringV(block, f, b):
     front = block.find(f)
@@ -279,7 +278,7 @@ def getData():
     judges = []
     courts = []
 
-    for begin in range(2013,2018):
+    for begin in range(2013,2014):
         end = begin + 1
         print("begin " + str(begin))
         print("end " + str(end))
@@ -308,6 +307,7 @@ def getData():
                         if (len(cols) > 5):
                             dates.append(cols[0].get_text())
                             temp_id = cols[1].get_text().split(" ", 1)[0]
+                            print(temp_id)
                             ids.append(temp_id)
                             districts.append(county)
                             case_types.append(stype)
@@ -326,13 +326,23 @@ def getData():
                                 parties = parties + (scrapeCaseParties(temp_id, temp_tables[3]))
                                 docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[4]))
                             elif num == 5:
+
                                 violations = violations + (scrapeViolations(temp_id, temp_page))
                                 sentences = sentences + (scrapeSentences(temp_id, temp_page))
+
+                                if temp_tables[2].find_all("th")[0] == "<th>Event</th>":
+                                    #This is for a weird edge case id=41CR-15-146
+                                    scrapeCaseParties("41CR-15-146", temp_tables[3])
+                                    docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[4]))
+                                else:
+                                    parties = parties + (scrapeCaseParties(temp_id, temp_tables[2]))    
+                                    docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[3]))
+                                
+                                
+                            elif num == 4:
                                 parties = parties + (scrapeCaseParties(temp_id, temp_tables[2]))
-                                docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[3]))
                             else:
-                                print("Diff # of tables? # = " + num + " ID:" + temp_id)    
-                            print(temp_id)
+                                print("Diff # of tables? # = " + str(num) + " ID:" + str(temp_id))    
                 
     cases = pd.DataFrame(
         {'date': dates,
@@ -352,17 +362,14 @@ def getData():
     p = pd.DataFrame(parties, columns=['case_id', 'seq', 'assoc', 'end_date', 'type', 'id', 'name', 'aliases'])
     d = pd.DataFrame(docket_entries, columns=['case_id', 'filling_date', 'description', 'name', 'monetary', 'entry', 'image'])
 
-    # print(sentences)
-    # print("*********")
-    # print(s)
-
-    cases.to_csv("cases.csv", sep=',')
-    v.to_csv("violations.csv", sep=',')
+    cases.to_csv("cases_2013.csv", sep=',')
+    v.to_csv("violations_2013.csv", sep=',')
 
     if sentences != []:
-        s.to_csv("sentences.csv", sep=',')
+        s.to_csv("sentences_2013.csv", sep=',')
 
-    p.to_csv("parties.csv", sep=',')
-    d.to_csv("docket_entries.csv", sep=',')
+    p.to_csv("parties_2013.csv", sep=',')
+    d.to_csv("docket_entries_2013.csv", sep=',')
 
 getData()
+
