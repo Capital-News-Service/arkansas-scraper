@@ -1,6 +1,6 @@
 # Jake Gluck - Capital News Service #
 
-#Dianne Robinson 5016876799
+#Arkansas Contact - Dianne Robinson 501-687-6799
 
 #pip.main(['install','requests'])
 #pip.main(['install','pandas'])
@@ -278,7 +278,8 @@ def getData():
     judges = []
     courts = []
 
-    for begin in range(2013,2014):
+    #I normally run this one year at a time, but put in the range of years to scrape
+    for begin in range(2017,2018):
         end = begin + 1
         print("begin " + str(begin))
         print("end " + str(end))
@@ -330,10 +331,14 @@ def getData():
                                 violations = violations + (scrapeViolations(temp_id, temp_page))
                                 sentences = sentences + (scrapeSentences(temp_id, temp_page))
 
-                                if temp_tables[2].find_all("th")[0] == "<th>Event</th>":
-                                    #This is for a weird edge case id=41CR-15-146
-                                    scrapeCaseParties("41CR-15-146", temp_tables[3])
-                                    docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[4]))
+                                if (temp_tables[2].find_all("th")[0].text == "Event"):
+                                    #This is for a weird edge case id= 41CR-15-146 and 27CR-17-71
+                                    if (temp_tables[3].find_all("th")[1] == "Description"):
+                                        #27CR-17-71
+                                        docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[4]))
+                                    elif (temp_tables[3].find_all("th")[1] == "Assoc"):
+                                        #41CR-15-146
+                                        parties = parties + scrapeCaseParties(temp_id, temp_tables[3])
                                 else:
                                     parties = parties + (scrapeCaseParties(temp_id, temp_tables[2]))    
                                     docket_entries = docket_entries + (scrapeDocketEntries(temp_id, temp_tables[3]))
@@ -362,14 +367,13 @@ def getData():
     p = pd.DataFrame(parties, columns=['case_id', 'seq', 'assoc', 'end_date', 'type', 'id', 'name', 'aliases'])
     d = pd.DataFrame(docket_entries, columns=['case_id', 'filling_date', 'description', 'name', 'monetary', 'entry', 'image'])
 
-    cases.to_csv("cases_2013.csv", sep=',')
-    v.to_csv("violations_2013.csv", sep=',')
+    cases.to_csv("cases_2017.csv", sep=',')
+    v.to_csv("violations_2017.csv", sep=',')
 
     if sentences != []:
-        s.to_csv("sentences_2013.csv", sep=',')
+        s.to_csv("sentences_2017.csv", sep=',')
 
-    p.to_csv("parties_2013.csv", sep=',')
-    d.to_csv("docket_entries_2013.csv", sep=',')
+    p.to_csv("parties_2017.csv", sep=',')
+    d.to_csv("docket_entries_2017.csv", sep=',')
 
 getData()
-
